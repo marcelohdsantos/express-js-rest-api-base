@@ -1,5 +1,10 @@
 var User = require("../models/User");
 const { use } = require("../routes/routes");
+var PasswordToken = require("../models/PasswordToken");
+var bcrypt = require("bcrypt");
+var jwt = require("jsonwebtoken")
+
+var secret = "klsdgklasnklafdnçvklfdanlvmndvlmdzkl"
 
 class UserController {
   async index(req, res) {
@@ -8,16 +13,16 @@ class UserController {
   }
 
   async findUser(req, res) {
-    var id = req.params.id;    
+    var id = req.params.id;
 
     var user = await User.findById(id);
 
-    if(user == undefined) {
-        res.status(404)
-        res.json({})
+    if (user == undefined) {
+      res.status(404);
+      res.json({});
     } else {
-        res.status(200)
-        res.json(user)
+      res.status(200);
+      res.json(user);
     }
   }
 
@@ -48,40 +53,100 @@ class UserController {
 
     await User.new(email, password, name);
 
-    res.status(200).json({ msg: "Tudo ok!" });
+    res.status(200).json({ msg: "Usuário foi cadastrado com sucesso!" });
   }
 
   async edit(req, res) {
-    var {name, role, email} = req.params.body 
-    
+    var { name, role, email } = req.params.body;
+
     var result = await User.update(id, email, name, role);
 
     if (result != undefined) {
-        if(result.status) {
-            res.status(200);
-            res.send('Tudo ok!');
-        } else {
-            res.status(406)
-            res.send(result.err)
-        }
-    } else {
+      if (result.status) {
+        res.status(200);
+        res.send("Tudo ok!");
+      } else {
         res.status(406);
-        res.send("Ocorreu um erro no servidor!");
+        res.send(result.err);
+      }
+    } else {
+      res.status(406);
+      res.send("Ocorreu um erro no servidor!");
     }
   }
 
   async remove(req, res) {
-
     var id = req.params.id;
 
-    var result = await User.delete(id)
+    var result = await User.delete(id);
 
-    if(result.status) {
+    if (result.status) {
       res.status(200);
-      res.send("Tudo ok")
+      res.send("Tudo ok");
     } else {
       res.status(406);
-      res.send(result.err)
+      res.send(result.err);
+    }
+  }
+
+  async recoverPassword(req, res) {
+    var email = req.body.email;
+
+    var result = await PasswordToken.create(email);
+
+    if (result.status) {
+      res.status(200);
+      res.send(result.token.toString());
+    } else {
+      res.status(406);
+      res.send(result.err);
+    }
+  }
+
+  async changePassword(req, res) {
+    var token = req.body.token;
+    var password = req.body.password;
+
+    var isToekenValid = await PasswordToken.validate(token);
+
+    if (isToekenValid.status) {
+      await User.changePassword(
+        password,
+        isToekenValid,
+        token.user_id,
+        isToekenValid.token.token
+      );
+
+      res.send("senha alterada com sucesso.");
+    } else {
+      res.status(406);
+      res.send("Token inválido!");
+    }
+  }
+
+  async login(req, res) {
+    var { email, password } = req.body;
+
+    var user = await User.findByEmail(email);
+
+    if (user != undefined) {
+      var result = bcrypt.compare(password, user.password);
+
+
+      if (result) {
+
+        var token = jwt.sign({ email: user.email, role: user.role}, secret);
+
+        res.status(200);
+        res.json({token: token})
+        
+      } else {
+        res.status(406);
+        res.send("Senha incorreta!");
+      }      
+
+    } else {
+      res.json({ status: false });
     }
   }
 }

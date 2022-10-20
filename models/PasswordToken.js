@@ -7,13 +7,18 @@ class PasswordToken {
 
     if (user != undefined) {
       try {
-        await knex.insert({
-          user_id: user.id,
-          used: 0,
-          token: Date.now,
-        });
+        var token = Date.now();
+        await knex
+          .insert({
+            user_id: user.id,
+            used: 0, //Recuperação de senha melhor utilizar o UUID
+            token: token,
+          })
+          .table("passwordtokens");
+        return { status: true, token: token };
       } catch (error) {
         console.log(err);
+        return { status: false, err: err };
       }
     } else {
       return {
@@ -21,6 +26,34 @@ class PasswordToken {
         err: "O email informado não existe no banco de dados!",
       };
     }
+  }
+
+  async validate(token) {
+    try {
+      var result = await knex
+        .select()
+        .where({ token: token }.table("passwordtokens"));
+
+      if (result.length > 0) {
+        var tk = result[0];
+
+        if (tk.used) {
+          return {status: false};
+        } else {
+          return {status: true, token: tk};
+        }
+
+      } else {
+        return {status: false};
+      }
+    } catch (err) {
+      console.log(err);
+      return {status: false};
+    }
+  }
+
+  async setUsed(token) {
+    await knex.update({used: 1}).where({toke: token}).table("passwordtokens")
   }
 }
 
